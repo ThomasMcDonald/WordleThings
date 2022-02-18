@@ -1,4 +1,4 @@
-import {useState, useEffect, useRef} from "../../_snowpack/pkg/react.js";
+import {useState, useEffect, useRef} from "../pkg/react.js";
 export default function useInView(ref) {
   const observable = useRef(null);
   const [inView, setInView] = useState(true);

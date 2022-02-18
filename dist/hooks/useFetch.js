@@ -1,4 +1,4 @@
-import {useState, useEffect} from "../../_snowpack/pkg/react.js";
+import {useState, useEffect} from "../pkg/react.js";
 export default function useFetch(options) {
   const [response, setResponse] = useState();
   const [error, setError] = useState();
