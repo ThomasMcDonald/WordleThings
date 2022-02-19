@@ -1,7 +1,7 @@
 /** @type {import("snowpack").SnowpackUserConfig } */
 export default {
   mount: {
-    public: { url: '/', static: true },
+    public: { url: '/', static: true, dot: true },
     src: { url: '/dist' },
   },
   plugins: [
@@ -21,7 +21,7 @@ export default {
   ],
   optimize: {
     /* Example: Bundle your final build: */
-    // "bundle": true,
+    bundle: true,
   },
   packageOptions: {
     /* ... */
@@ -30,6 +30,8 @@ export default {
     /* ... */
   },
   buildOptions: {
+    baseUrl: '/WordleThings',
+    metaUrlPath: '/dist'
     /* ... */
   },
 };

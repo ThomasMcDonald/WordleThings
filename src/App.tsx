@@ -1,7 +1,6 @@
 import React, { useEffect, useState, useRef, createRef } from 'react';
 import './App.css';
-import useRenderCount from './hooks/useRenderCount';
-import wordList from './words.json';
+import wordList from './words';
 
 enum LetterState {
 	current,
@@ -15,34 +14,28 @@ type LetterType = {
 
 type LetterProps = {
 	index: number;
-	inputRef: any; // whatever react ref type is
+	inputRef: React.RefObject<HTMLInputElement>; // whatever react ref type is
 	onChange: (e:any) => void;
 	onClick: (e:any) => void;
-	onKeyDown: (key: number, index: number) => void;
 	letter: LetterType
 }
 
+// type RefArray = React.RefObject<HTMLInputElement>[];
+interface RefArray {
+	[key: number]: React.RefObject<HTMLInputElement>
+}
+
 function Letter(props: LetterProps): JSX.Element {
-	const { index, inputRef, onChange, onClick, onKeyDown, letter } = props;
+	const { index, inputRef, onChange, onClick, letter } = props;
 	const { value, state } = letter;
 
-	const onKeyPress = (e) => {
-		const key = e.keyCode
-		onKeyDown(key, index);
-	}
-
-
-
 	return (
-		<div className={'letter'} onKeyDown={onKeyPress}>
-
-			<input 
-				data-index={index} 
-				key={index} 
+		<div className={'letter'} onKeyDown={onChange} data-index={index}>
+			<input
+				readOnly={true}
 				ref={inputRef} 
 				value={value} 
 				maxLength={1}
-				onChange={onChange}
 				style= {{
 					backgroundColor: state === LetterState.current ? 'green' : 'white'
 				}}
@@ -55,32 +48,51 @@ function Letter(props: LetterProps): JSX.Element {
 
 function App() {
 	const [wordLength, setWordLength] = useState(5);
+	const [filteredWords, setFilteredWords] = useState([...wordList]);
 	const [letters, setLetters] = useState<LetterType[]>([]);
-	const letterInputs = useRef({})
-	const count = useRenderCount();
+	const letterInputs = useRef<RefArray>({})
 
-	const onLetterChange = (e) => {
-		const index = Number(e.target.getAttribute('data-index'));
-		const value = e.target.value;
+	const onLetterChange = (e: React.KeyboardEvent) => {
+		const key = e.keyCode;
+		const index = Number(e.currentTarget.getAttribute('data-index'));
+		let nextLetterIndex = index;
 
-		setLetters((state) => {
-			const newState = [...state];
-			newState[index].value = value;
-			return newState;
-		});
+		let newLetter: string | number = -1; // jank to get the ts rules to stop yelling at me
 
-		let nextLetterIndex = index + 1;
+		switch (key) {
+			case 8: // backspace
+				newLetter = '';
+				nextLetterIndex -= 1;
+				break;
+			case 37: // left arrow
+				nextLetterIndex -= 1;
+				break;
+			case 39: // right arrow
+				nextLetterIndex += 1;
+				break;
+			default: 
+				if (key >= 65 && key <= 122) {
+					newLetter = String.fromCharCode(key);
+					nextLetterIndex += 1;
+				}			
+				break;
+		}
 
-		if (!value.length) {
-			nextLetterIndex = index - 1;
-		} 
-		
+
+		if (newLetter !== -1) {
+			setLetters((state) => {
+				const newState = [...state];
+				newState[index].value = newLetter as string;
+				return newState;
+			});
+		}	
+
 		// change focus to next available letter
-		letterInputs.current[nextLetterIndex]?.current.focus();
+		letterInputs.current[nextLetterIndex].current?.focus();
 	}
 	
-	const onClick = (e) => {
-		const index = e.target.getAttribute('data-index');
+	const onClick = (e: React.MouseEvent) => {
+		const index = Number(e.currentTarget.getAttribute('data-index'));
 
 		if (letters[index]) {
 			let newLetterState = LetterState.current;
@@ -97,46 +109,29 @@ function App() {
 		}
 	}
 
-	const getComputedWords = (searchBy: LetterType[]): string[] => {
-		let filteredWords: string[] = [...wordList];
-
-		for (const [index, letter] of searchBy.entries()) {
-			filteredWords = filteredWords.filter((word) => {
-				switch(letter.state) {
-					case LetterState.anywhere: 
-						return word.indexOf(letter.value) !== -1;
-						// just needs to exist somewhere in the string
-					case LetterState.current: 
-						return word[index] === letter.value;
-						// needs to exist at current index
-					default:
-						return true;
-				}
-			});
-		}
-
-		return filteredWords
-	}
-
-	const onKeydown = (key: number, index: number) => {
-
+	const getComputedWords = () => {
+		let words: string[] = [...wordList];
 		
-		let nextIndex = index;
-		switch(key) {
-			case 8:
-			case 37: 
-				nextIndex -= 1;
-				break;
-			case 39:
-				nextIndex += 1;
-				break;
-			default:
-				break;
+		for (const [index, letter] of letters.entries()) {
+			const value = letter.value?.toLowerCase();
+			if (value) {
+				words = words.filter((word) => {
+					switch(letter.state) {
+						case LetterState.anywhere: 
+							return word.indexOf(value) !== -1;
+							// just needs to exist somewhere in the string
+						case LetterState.current: 
+							return word[index] === value;
+							// needs to exist at current index
+						default:
+							return true;
+					}
+				});
+			}
 		}
 
-		letterInputs.current[nextIndex]?.current.focus();
+		setFilteredWords(words);
 	}
-
 
 	useEffect(() => {
 		const newLetters: LetterType[] = [];
@@ -151,14 +146,13 @@ function App() {
 		}	
 
 		setLetters(newLetters);
-		letterInputs.current = newRefs;
+		letterInputs.current = newRefs as RefArray;
 
 	}, [wordLength])
 
 	return (
 		<div className="App">
-			<p>Render Count: {count}</p>
-
+			<button onClick={getComputedWords}>Filter</button>
 			<div className='container'> 
 				<div className='row'> 
 					{	
@@ -171,7 +165,6 @@ function App() {
 									letter={letter}
 									onChange={onLetterChange}
 									onClick={onClick}
-									onKeyDown={onKeydown}
 								/>
 							)
 						})
@@ -181,7 +174,7 @@ function App() {
 					
 			<div className='wordContainer'>
 				<div className='wordRow'>
-					{getComputedWords(letters).map((word, index) => {
+					{filteredWords.map((word, index) => {
 						return (
 							<p key={`word_${index}`}>
 								{word}
@@ -190,8 +183,6 @@ function App() {
 					})}
 				</div>
 			</div>
-
-
 		</div>
 	);
 }
