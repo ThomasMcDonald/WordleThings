@@ -6998,15 +6998,6 @@ var reactDom = createCommonjsModule(function(module) {
 });
 var react_dom_default = reactDom;
 
-// build/dist/hooks/useRenderCount.js
-function useRenderCount() {
-  const count = useRef(0);
-  useEffect(() => {
-    count.current += 1;
-  });
-  return count.current;
-}
-
 // build/dist/words.js
 var words_default = [
   "aback",
@@ -9333,22 +9324,17 @@ var LetterState;
   LetterState2[LetterState2["anywhere"] = 1] = "anywhere";
 })(LetterState || (LetterState = {}));
 function Letter(props) {
-  const {index, inputRef, onChange, onClick, onKeyDown, letter} = props;
+  const {index, inputRef, onChange, onClick, letter} = props;
   const {value, state} = letter;
-  const onKeyPress = (e) => {
-    const key = e.keyCode;
-    onKeyDown(key, index);
-  };
   return /* @__PURE__ */ react.createElement("div", {
     className: "letter",
-    onKeyDown: onKeyPress
+    onKeyDown: onChange,
+    "data-index": index
   }, /* @__PURE__ */ react.createElement("input", {
-    "data-index": index,
-    key: index,
+    readOnly: true,
     ref: inputRef,
     value,
     maxLength: 1,
-    onChange,
     style: {
       backgroundColor: state === 0 ? "green" : "white"
     }
@@ -9359,25 +9345,43 @@ function Letter(props) {
 }
 function App() {
   const [wordLength, setWordLength] = useState(5);
+  const [filteredWords, setFilteredWords] = useState([...words_default]);
   const [letters, setLetters] = useState([]);
   const letterInputs = useRef({});
-  const count = useRenderCount();
   const onLetterChange = (e) => {
-    const index = Number(e.target.getAttribute("data-index"));
-    const value = e.target.value;
-    setLetters((state) => {
-      const newState = [...state];
-      newState[index].value = value;
-      return newState;
-    });
-    let nextLetterIndex = index + 1;
-    if (!value.length) {
-      nextLetterIndex = index - 1;
+    const key = e.keyCode;
+    const index = Number(e.currentTarget.getAttribute("data-index"));
+    let nextLetterIndex = index;
+    let newLetter = -1;
+    switch (key) {
+      case 8:
+        newLetter = "";
+        nextLetterIndex -= 1;
+        break;
+      case 37:
+        nextLetterIndex -= 1;
+        break;
+      case 39:
+        nextLetterIndex += 1;
+        break;
+      default:
+        if (key >= 65 && key <= 122) {
+          newLetter = String.fromCharCode(key);
+          nextLetterIndex += 1;
+        }
+        break;
     }
-    letterInputs.current[nextLetterIndex]?.current.focus();
+    if (newLetter !== -1) {
+      setLetters((state) => {
+        const newState = [...state];
+        newState[index].value = newLetter;
+        return newState;
+      });
+    }
+    letterInputs.current[nextLetterIndex].current?.focus();
   };
   const onClick = (e) => {
-    const index = e.target.getAttribute("data-index");
+    const index = Number(e.currentTarget.getAttribute("data-index"));
     if (letters[index]) {
       let newLetterState = 0;
       if (letters[index].state === newLetterState) {
@@ -9390,36 +9394,24 @@ function App() {
       });
     }
   };
-  const getComputedWords = (searchBy) => {
-    let filteredWords = [...words_default];
-    for (const [index, letter] of searchBy.entries()) {
-      filteredWords = filteredWords.filter((word) => {
-        switch (letter.state) {
-          case 1:
-            return word.indexOf(letter.value) !== -1;
-          case 0:
-            return word[index] === letter.value;
-          default:
-            return true;
-        }
-      });
+  const getComputedWords = () => {
+    let words = [...words_default];
+    for (const [index, letter] of letters.entries()) {
+      const value = letter.value?.toLowerCase();
+      if (value) {
+        words = words.filter((word) => {
+          switch (letter.state) {
+            case 1:
+              return word.indexOf(value) !== -1;
+            case 0:
+              return word[index] === value;
+            default:
+              return true;
+          }
+        });
+      }
     }
-    return filteredWords;
-  };
-  const onKeydown = (key, index) => {
-    let nextIndex = index;
-    switch (key) {
-      case 8:
-      case 37:
-        nextIndex -= 1;
-        break;
-      case 39:
-        nextIndex += 1;
-        break;
-      default:
-        break;
-    }
-    letterInputs.current[nextIndex]?.current.focus();
+    setFilteredWords(words);
   };
   useEffect(() => {
     const newLetters = [];
@@ -9436,7 +9428,9 @@ function App() {
   }, [wordLength]);
   return /* @__PURE__ */ react.createElement("div", {
     className: "App"
-  }, /* @__PURE__ */ react.createElement("p", null, "Render Count: ", count), /* @__PURE__ */ react.createElement("div", {
+  }, /* @__PURE__ */ react.createElement("button", {
+    onClick: getComputedWords
+  }, "Filter"), /* @__PURE__ */ react.createElement("div", {
     className: "container"
   }, /* @__PURE__ */ react.createElement("div", {
     className: "row"
@@ -9447,14 +9441,13 @@ function App() {
       inputRef: letterInputs.current[index],
       letter,
       onChange: onLetterChange,
-      onClick,
-      onKeyDown: onKeydown
+      onClick
     });
   }))), /* @__PURE__ */ react.createElement("div", {
     className: "wordContainer"
   }, /* @__PURE__ */ react.createElement("div", {
     className: "wordRow"
-  }, getComputedWords(letters).map((word, index) => {
+  }, filteredWords.map((word, index) => {
     return /* @__PURE__ */ react.createElement("p", {
       key: `word_${index}`
     }, word);
